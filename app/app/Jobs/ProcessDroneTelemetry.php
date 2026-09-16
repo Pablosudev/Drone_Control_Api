@@ -35,6 +35,14 @@ class ProcessDroneTelemetry implements ShouldQueue
                 return;
             }
             $drone->telemetries()->create($this->telemetry);
+
+            $drone->forceFill([
+                'status' => $this->telemetry['status'],
+                'battery_percentage' => $this->telemetry['battery_percentage'],
+                'latitude' => $this->telemetry['latitude'],
+                'longitude' => $this->telemetry['longitude'],
+                'last_telemetry_sequence' => $this->telemetry['sequence'],
+            ])->save();
         });
     }
 }

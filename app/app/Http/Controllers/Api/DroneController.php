@@ -5,31 +5,33 @@ use App\Http\Controllers\Controller;
 use App\Models\Drone;
 use App\Http\Requests\StoreDroneRequest;
 use App\Http\Requests\UpdateDroneRequest;
-
+use App\Http\Resources\DroneResource;
 
 
 class DroneController extends Controller
 {
     
     public function index(){
-        return Drone::query()->get();
+        $drones = Drone::query()->get();
+        return DroneResource::collection($drones);
     }
 
     public function store(StoreDroneRequest $request){
         $drone = Drone::create($request->validated());
         $drone->refresh();
-        return response()->json($drone,201);
+        return (new DroneResource($drone))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Drone $drone){
-        return $drone;
+        return new DroneResource($drone);
     }
 
     public function update(UpdateDroneRequest $request, Drone $drone){
         $drone->update($request->validated());
-        return response()->json($drone);
+        return (new DroneResource($drone));
     }
-
 
 
 }

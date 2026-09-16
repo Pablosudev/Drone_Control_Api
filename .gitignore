@@ -1,7 +1,3 @@
-# Local SSH credentials. Never commit private keys or their paired public keys.
-/aries
-/aries.pub
-
 # Local environment files may contain credentials and configuration secrets.
 /.env
 /.env.*
