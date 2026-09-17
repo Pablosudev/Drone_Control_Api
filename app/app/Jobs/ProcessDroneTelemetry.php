@@ -24,6 +24,7 @@ class ProcessDroneTelemetry implements ShouldQueue
      */
     public function handle(): void
     {
+        // throw new \RuntimeException('Fallo de prueba de telemetría');
         DB::transaction(function () {
             $drone = Drone::query()
                 ->lockForUpdate()
