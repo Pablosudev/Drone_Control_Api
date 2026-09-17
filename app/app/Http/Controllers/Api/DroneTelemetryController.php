@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IngestDroneTelemetryRequest;
 use App\Models\Drone;
-use App\Http\Requests\UpdateDroneTelemetryRequest;
-use App\Jobs\ProcessDroneTelemetry;
 use App\Http\Resources\DroneTelemetryResource;
+use App\Jobs\ProcessDroneTelemetry;
+use Illuminate\Support\Str;
 
 class DroneTelemetryController extends Controller
 {
@@ -18,14 +19,24 @@ class DroneTelemetryController extends Controller
             ->paginate(20);
         return DroneTelemetryResource::collection($telemetries);
     }
-    public function store(UpdateDroneTelemetryRequest $request, Drone $drone){
+    public function store(IngestDroneTelemetryRequest $request, Drone $drone){
 
-        ProcessDroneTelemetry::dispatch($drone, $request->validated());
+        $telemetry = $request->validated();
+        $telemetryForJob = [
+            'message_id' => (string) Str::uuid(),
+            'sequence' => $telemetry['sequence'],
+            'status' => $telemetry['status'],
+            'battery_percentage' => $telemetry['battery_percentage'],
+            'latitude' => $telemetry['latitude'],
+            'longitude' => $telemetry['longitude'],
+            'observed_at' => $telemetry['sent_at']
+
+        ];
+        ProcessDroneTelemetry::dispatch($drone, $telemetryForJob);
 
         return response()->json([
-            'message' => 'Telemetría aceptada para procesar',
-        ], 202);
-    }
-
-    
+            'message' => 'Telemetría aceptada para procesarse',
+            'drone_id' => $drone->id,
+        ],202);
+    }    
 }
