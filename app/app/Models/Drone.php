@@ -24,6 +24,8 @@ class Drone extends Model
             'battery_percentage' => 'integer',
             'latitude' => 'float',
             'longitude' => 'float',
+            'last_telemetry_sequence' => 'integer',
+            'last_telemetry_at' => 'datetime',
         ];
     }
 
@@ -31,5 +33,4 @@ class Drone extends Model
     {
         return $this->hasMany(DroneTelemetry::class);
     }
-
 }

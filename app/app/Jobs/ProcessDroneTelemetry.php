@@ -29,21 +29,30 @@ class ProcessDroneTelemetry implements ShouldQueue
             $drone = Drone::query()
                 ->lockForUpdate()
                 ->findOrFail($this->drone->getKey());
-            if (
-                $drone->last_telemetry_sequence !== null
-                && $this->telemetry['sequence'] <= $drone->last_telemetry_sequence
-            ) {
+
+            $alreadyStored = $drone->telemetries()
+                ->where('sequence', $this->telemetry['sequence'])
+                ->exists();
+            if ($alreadyStored) {
                 return;
             }
+
             $drone->telemetries()->create($this->telemetry);
 
-            $drone->forceFill([
-                'status' => $this->telemetry['status'],
-                'battery_percentage' => $this->telemetry['battery_percentage'],
-                'latitude' => $this->telemetry['latitude'],
-                'longitude' => $this->telemetry['longitude'],
-                'last_telemetry_sequence' => $this->telemetry['sequence'],
-            ])->save();
+            if (
+                $drone->last_telemetry_sequence === null ||
+                $this->telemetry['sequence'] > $drone->last_telemetry_sequence
+            ) {
+
+                $drone->forceFill([
+                    'status' => $this->telemetry['status'],
+                    'battery_percentage' => $this->telemetry['battery_percentage'],
+                    'latitude' => $this->telemetry['latitude'],
+                    'longitude' => $this->telemetry['longitude'],
+                    'last_telemetry_sequence' => $this->telemetry['sequence'],
+                    'last_telemetry_at' => $this->telemetry['observed_at']
+                ])->save();
+            }
         });
     }
 }
