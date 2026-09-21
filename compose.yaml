@@ -37,7 +37,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-  
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config:ro
+  simulator:
+    image: eclipse-mosquitto:2
+    depends_on:
+      - mqtt
+    volumes:
+      - ./docker/mosquitto/simulator:/simulator:ro
+    command: sh /simulator/drone-simulator.sh
   worker:
     build:
       context: .
