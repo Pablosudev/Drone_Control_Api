@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\TelemetryRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -20,15 +21,8 @@ class IngestDroneTelemetryRequest extends FormRequest
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
-    public function rules(): array
+    public function rules()
     {
-        return [
-            'status' => ['required','string','in:available,flying,charging,offline'],
-            'battery_percentage' => ['required','integer','between:0,100'],
-            'latitude' => ['required','numeric','between:-90,90'],
-            'longitude' => ['required','numeric','between:-180,180'],
-            'sequence' => ['required', 'integer','min:0'],
-            'sent_at' => ['required','date'] 
-        ];
+        TelemetryRules::ingest();
     }
 }

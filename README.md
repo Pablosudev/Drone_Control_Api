@@ -28,6 +28,10 @@ Proyecto práctico de una API de control y telemetría de drones con Laravel, Do
    REDIS_HOST=redis
    REDIS_PORT=6379
    QUEUE_CONNECTION=redis
+
+   MQTT_HOST=mqtt
+   MQTT_PORT=1883
+   MQTT_CLIENT_ID=drone-control-api-consumer
    ```
 
 3. Construye y levanta los servicios:
@@ -80,6 +84,7 @@ Los contenedores comparten la red interna de Docker Compose. Por eso Laravel usa
 - **Redis 7**: cola asíncrona de Laravel; desacopla la petición HTTP del procesamiento de telemetría.
 - **Eclipse Mosquitto 2**: broker MQTT para comunicación publish/subscribe con dispositivos.
 - **MQTT**: protocolo ligero para IoT. El simulador publica en el topic `drones/1/telemetry`.
+- **php-mqtt/laravel-client**: cliente MQTT para que Laravel se conecte y se suscriba a Mosquitto.
 
 ## Uso actual
 
@@ -150,7 +155,19 @@ Para detener temporalmente las publicaciones:
 docker compose stop simulator
 ```
 
-Actualmente MQTT está probado de forma manual. Aún no existe un consumer Laravel suscrito al broker.
+Laravel incluye el comando `mqtt:consume-drone-telemetry`, que se conecta a Mosquitto y se suscribe a `drones/+/telemetry`. En esta iteración inicial imprime los mensajes recibidos; todavía no los valida ni los encola.
+
+Para ejecutarlo manualmente:
+
+```bash
+docker compose exec app php artisan mqtt:consume-drone-telemetry
+```
+
+El flujo MQTT actual es:
+
+```text
+simulator → Mosquitto → consumer Artisan manual → consola
+```
 
 ## Estado actual y siguientes tareas
 
@@ -164,11 +181,13 @@ Implementado:
 - API Resources para drones y telemetría paginada.
 - Broker MQTT, publisher/simulator y subscriber manual verificados.
 - `TelemetryIngestionService` para evitar duplicar la normalización y el encolado entre transportes.
+- Paquete `php-mqtt/laravel-client` y comando Artisan subscriber MQTT inicial.
 
 Pendiente:
 
-- Crear un consumer Laravel MQTT que se suscriba a `drones/{id}/telemetry`, valide el JSON y reutilice `TelemetryIngestionService`.
-- Reutilizar las reglas de validación entre HTTP y MQTT sin duplicarlas.
+- Completar el consumer MQTT: decodificar JSON, extraer el identificador del dron desde el topic, validar el payload y reutilizar `TelemetryIngestionService`.
+- Ejecutar el consumer MQTT como servicio Docker de larga duración, separado de `app` y `worker`.
+- Conectar `TelemetryRules` tanto al Form Request HTTP como al consumer MQTT para que las reglas no se dupliquen.
 - Hacer la secuencia del simulador persistente o configurable tras reinicios.
 - Autenticación y autorización para operadores y dispositivos.
 - Completar operaciones de gestión de drones, según reglas de negocio (por ejemplo, borrado lógico).
