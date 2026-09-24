@@ -14,7 +14,6 @@ services:
       redis:
         condition: service_healthy
     command: php artisan serve --host=0.0.0.0 --port=8000
-
   mysql:
     image: mysql:8.0
     environment:

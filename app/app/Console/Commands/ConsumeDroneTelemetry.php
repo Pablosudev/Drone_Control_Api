@@ -33,10 +33,9 @@ class ConsumeDroneTelemetry extends Command
                     $this->error("Invalid telemetry topic: {$topic}");
 
                     return;
-                }
-
+                } 
                 $droneId = (int) $matches[1];
-                try {
+                try {                
                     $telemetry = json_decode(
                         $message,
                         true,

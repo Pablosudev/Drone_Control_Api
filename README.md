@@ -107,7 +107,7 @@ El endpoint de telemetría recibe un snapshot completo con:
 status, battery_percentage, latitude, longitude, sequence, sent_at
 ```
 
-Una petición válida responde `202 Accepted`. Laravel valida el body, normaliza el payload y encola `ProcessDroneTelemetry` en Redis.
+Una petición válida responde `202 Accepted`. El objetivo del flujo es validar el body, normalizar el payload y encolar `ProcessDroneTelemetry` en Redis.
 
 ### Procesamiento de telemetría
 
@@ -131,7 +131,7 @@ El Job procesa cada lectura dentro de una transacción y usa `lockForUpdate()` p
 
 La restricción única `(drone_id, sequence)` y la comprobación previa evitan duplicados. Una secuencia tardía se conserva en el histórico, pero no hace retroceder el snapshot actual.
 
-### MQTT manual
+### MQTT y consumer Laravel
 
 Mosquitto escucha MQTT/TCP en el puerto `1883`. Para escuchar un topic manualmente:
 
@@ -155,7 +155,15 @@ Para detener temporalmente las publicaciones:
 docker compose stop simulator
 ```
 
-Laravel incluye el comando `mqtt:consume-drone-telemetry`, que se conecta a Mosquitto y se suscribe a `drones/+/telemetry`. En esta iteración inicial imprime los mensajes recibidos; todavía no los valida ni los encola.
+Laravel incluye el comando `mqtt:consume-drone-telemetry`, que se conecta a Mosquitto y se suscribe al patrón `drones/+/telemetry`. Por cada mensaje, el consumer:
+
+1. Comprueba que el topic tenga la forma `drones/{id}/telemetry`.
+2. Decodifica el JSON de forma segura.
+3. Valida el payload mediante `TelemetryRules`.
+4. Busca el dron indicado en el topic.
+5. Delega en `TelemetryIngestionService`, que normaliza el mensaje y encola `ProcessDroneTelemetry` en Redis.
+
+Así, HTTP y MQTT son dos puertas de entrada distintas, pero ambos terminan reutilizando el mismo procesamiento asíncrono. El consumer se ejecuta manualmente por ahora; más adelante será un servicio Docker independiente.
 
 Para ejecutarlo manualmente:
 
@@ -166,7 +174,21 @@ docker compose exec app php artisan mqtt:consume-drone-telemetry
 El flujo MQTT actual es:
 
 ```text
-simulator → Mosquitto → consumer Artisan manual → consola
+simulator → Mosquitto → consumer Artisan manual
+→ TelemetryIngestionService → Redis Queue → worker → MySQL
+```
+
+Para comprobar el flujo completo, abre el consumer en una terminal y publica o deja activo el simulador. En otra terminal puedes observar el worker:
+
+```bash
+docker compose logs worker --tail=50 -f
+```
+
+Después consulta el snapshot y el histórico:
+
+```bash
+curl http://localhost:8000/api/drones/1
+curl http://localhost:8000/api/drones/1/telemetry
 ```
 
 ## Estado actual y siguientes tareas
@@ -175,19 +197,19 @@ Implementado:
 
 - Entorno Docker con Laravel, MySQL, Redis, worker, Mosquitto y simulador MQTT.
 - Gestión básica de drones.
-- Validación de telemetría HTTP mediante Form Request.
+- Estructura de validación compartida en `TelemetryRules`, utilizada por el consumer MQTT.
 - Cola Redis y worker con reintentos configurados.
 - Histórico, snapshot actual, transacciones, control de secuencia y deduplicación.
 - API Resources para drones y telemetría paginada.
 - Broker MQTT, publisher/simulator y subscriber manual verificados.
 - `TelemetryIngestionService` para evitar duplicar la normalización y el encolado entre transportes.
-- Paquete `php-mqtt/laravel-client` y comando Artisan subscriber MQTT inicial.
+- Paquete `php-mqtt/laravel-client` y consumer MQTT que valida, resuelve el dron y reutiliza el servicio de ingesta.
 
 Pendiente:
 
-- Completar el consumer MQTT: decodificar JSON, extraer el identificador del dron desde el topic, validar el payload y reutilizar `TelemetryIngestionService`.
+- Completar la integración de `TelemetryRules` en `IngestDroneTelemetryRequest`, para que HTTP y MQTT apliquen exactamente las mismas reglas.
+- Verificar de extremo a extremo el flujo MQTT con un mensaje nuevo: consumer, cola Redis, worker, histórico y snapshot actual.
 - Ejecutar el consumer MQTT como servicio Docker de larga duración, separado de `app` y `worker`.
-- Conectar `TelemetryRules` tanto al Form Request HTTP como al consumer MQTT para que las reglas no se dupliquen.
 - Hacer la secuencia del simulador persistente o configurable tras reinicios.
 - Autenticación y autorización para operadores y dispositivos.
 - Completar operaciones de gestión de drones, según reglas de negocio (por ejemplo, borrado lógico).
